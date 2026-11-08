@@ -104,21 +104,33 @@ jobs:
         /* Begin XCBuildConfiguration section */
                 I1 = {isa = XCBuildConfiguration; buildSettings = {
                     PRODUCT_NAME = "$(TARGET_NAME)";
-                    INFOPLIST_FILE = "";
+                    GENERATE_INFOPLIST_FILE = YES;
+                    INFOPLIST_KEY_CFBundleDisplayName = "externopolo";
+                    INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+                    INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+                    INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait";
                     CLANG_ENABLE_OBJC_ARC = NO;
                     CLANG_ENABLE_OBJC_WEAK = YES;
                     ALWAYS_SEARCH_USER_PATHS = NO;
                     OTHER_LDFLAGS = "-framework Security -framework UIKit -framework IOKit -framework CoreGraphics";
                     HEADER_SEARCH_PATHS = "$(SRCROOT)";
+                    IPHONEOS_DEPLOYMENT_TARGET = "14.0";
+                    PRODUCT_BUNDLE_IDENTIFIER = "com.externopolo.app";
                 }; name = Debug; };
                 I2 = {isa = XCBuildConfiguration; buildSettings = {
                     PRODUCT_NAME = "$(TARGET_NAME)";
-                    INFOPLIST_FILE = "";
+                    GENERATE_INFOPLIST_FILE = YES;
+                    INFOPLIST_KEY_CFBundleDisplayName = "externopolo";
+                    INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+                    INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+                    INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait";
                     CLANG_ENABLE_OBJC_ARC = NO;
                     CLANG_ENABLE_OBJC_WEAK = YES;
                     ALWAYS_SEARCH_USER_PATHS = NO;
                     OTHER_LDFLAGS = "-framework Security -framework UIKit -framework IOKit -framework CoreGraphics";
                     HEADER_SEARCH_PATHS = "$(SRCROOT)";
+                    IPHONEOS_DEPLOYMENT_TARGET = "14.0";
+                    PRODUCT_BUNDLE_IDENTIFIER = "com.externopolo.app";
                 }; name = Release; };
         /* End XCBuildConfiguration section */
         /* Begin XCConfigurationList section */
@@ -176,7 +188,10 @@ jobs:
           CLANG_ENABLE_OBJC_WEAK=YES \
           ALWAYS_SEARCH_USER_PATHS=NO \
           OTHER_LDFLAGS="-framework Security -framework UIKit -framework IOKit -framework CoreGraphics" \
-          HEADER_SEARCH_PATHS="$PWD"
+          HEADER_SEARCH_PATHS="$PWD" \
+          GENERATE_INFOPLIST_FILE=YES \
+          PRODUCT_BUNDLE_IDENTIFIER="com.externopolo.app" \
+          IPHONEOS_DEPLOYMENT_TARGET="14.0"
 
     - name: Create Unsigned IPA
       run: |
