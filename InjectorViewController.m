@@ -5,8 +5,6 @@
 #import "MCMInjector.h"
 #import "LoginOverlayView.h"
 
-// ---- Item definitions ----
-
 static NSArray *_aimItems(void) {
     return @[
         @{@"key": @"aim_pecho",  @"label": @"Aim Peito",   @"mod": @"Pecho"},
@@ -34,7 +32,7 @@ static NSArray *_extraItems(void) {
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.title = @"Polonium";
-    self.view.backgroundColor = [UIColor blackColor]; // Fundo escuro para combinar
+    self.view.backgroundColor = [UIColor blackColor];
     
     NSURLSessionConfiguration *cfg = [NSURLSessionConfiguration ephemeralSessionConfiguration];
     cfg.timeoutIntervalForRequest  = 60.0;
@@ -45,8 +43,13 @@ static NSArray *_extraItems(void) {
     [self buildUI];
 }
 
-// ---- Switch state ----
+// ---- AJUDANTE CRUCIAL: Descobre a linha da tabela de forma segura ----
+- (NSIndexPath *)indexPathForView:(UIView *)view {
+    CGPoint point = [view convertPoint:CGPointZero toView:self.tableView];
+    return [self.tableView indexPathForRowAtPoint:point];
+}
 
+// ---- Switch state ----
 - (BOOL)switchOn:(NSString *)key {
     NSString *k = [NSString stringWithFormat:@"switch_%@", key];
     return [[NSUserDefaults standardUserDefaults] boolForKey:k];
@@ -62,7 +65,6 @@ static NSArray *_extraItems(void) {
 }
 
 // ---- Inject / Bypass ----
-
 - (void)injectTapped  { [self startWithBypass:NO]; }
 - (void)bypassTapped  { [self startWithBypass:YES]; }
 
@@ -81,7 +83,7 @@ static NSArray *_extraItems(void) {
         return;
     }
 
-    NSInteger seg = self.gameSegment.selectedSegmentIndex;
+    NSInteger seg = self.gameSegment ? self.gameSegment.selectedSegmentIndex : 0;
     self.gameKey    = (seg == 0) ? @"ffth" : @"ffmax";
     self.isBypass   = bypass;
 
@@ -196,8 +198,6 @@ static NSArray *_extraItems(void) {
     return [dirs.firstObject stringByAppendingPathComponent:file];
 }
 
-// ---- Download queue ----
-
 - (void)buildQueueAndRun {
     NSMutableArray *ops = [NSMutableArray array];
 
@@ -244,11 +244,7 @@ static NSArray *_extraItems(void) {
     [[self.session downloadTaskWithURL:url] resume];
 }
 
-- (void)URLSession:(NSURLSession *)session
-      downloadTask:(NSURLSessionDownloadTask *)task
-      didWriteData:(int64_t)written
- totalBytesWritten:(int64_t)total
-totalBytesExpectedToWrite:(int64_t)expected {
+- (void)URLSession:(NSURLSession *)session downloadTask:(NSURLSessionDownloadTask *)task didWriteData:(int64_t)written totalBytesWritten:(int64_t)total totalBytesExpectedToWrite:(int64_t)expected {
     if (expected <= 0) return;
     float base = (float)self.opsDone / self.opsTotal;
     float step = (float)total / expected / self.opsTotal;
@@ -257,9 +253,7 @@ totalBytesExpectedToWrite:(int64_t)expected {
     });
 }
 
-- (void)URLSession:(NSURLSession *)session
-      downloadTask:(NSURLSessionDownloadTask *)task
-didFinishDownloadingToURL:(NSURL *)location {
+- (void)URLSession:(NSURLSession *)session downloadTask:(NSURLSessionDownloadTask *)task didFinishDownloadingToURL:(NSURL *)location {
     NSString *dest = self.currentCachePath;
     [[NSFileManager defaultManager] createDirectoryAtPath:[dest stringByDeletingLastPathComponent]
                                withIntermediateDirectories:YES attributes:nil error:nil];
@@ -284,8 +278,7 @@ didFinishDownloadingToURL:(NSURL *)location {
 
 - (void)applyCachedAssets {
     NSString *docs    = [self.containerPath stringByAppendingPathComponent:@"Documents"];
-    NSString *avatar  = [docs stringByAppendingPathComponent:
-        @"contentcache/Compulsory/ios/gameassetbundles/avatar/"];
+    NSString *avatar  = [docs stringByAppendingPathComponent:@"contentcache/Compulsory/ios/gameassetbundles/avatar/"];
     NSFileManager *fm = [NSFileManager defaultManager];
     void (^copyOp)(NSString *srcFile, NSString *destPath) = ^(NSString *srcFile, NSString *destPath) {
         NSString *cached = [self cachePathFor:srcFile];
@@ -376,11 +369,11 @@ didFinishDownloadingToURL:(NSURL *)location {
 // ---- CONTROLE AO VIVO switch handlers ----
 
 - (void)ctrlSwitchChanged:(UISwitch *)sw {
-    UITableViewCell *cell = (UITableViewCell *)sw.superview.superview;
-    NSIndexPath *ip = [self.tableView indexPathForCell:cell];
-    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    NSIndexPath *ip = [self indexPathForView:sw];
+    if (!ip) return;
     
-    if (ip.row == 0) { // Ativar
+    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    if (ip.row == 0) { 
         [d setBool:sw.isOn forKey:@"ctrl_ativar"];
         if (!sw.isOn) {
             [d setBool:NO forKey:@"ctrl_chams"];
@@ -388,8 +381,7 @@ didFinishDownloadingToURL:(NSURL *)location {
             [d setBool:NO forKey:@"ctrl_sf"];
             [d setBool:NO forKey:@"ctrl_ab"];
         }
-        [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:3]
-                      withRowAnimation:UITableViewRowAnimationFade];
+        [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:3] withRowAnimation:UITableViewRowAnimationFade];
     } else if (ip.row == 1) {
         [d setBool:sw.isOn forKey:@"ctrl_chams"];
     } else if (ip.row == 2) {
@@ -402,17 +394,18 @@ didFinishDownloadingToURL:(NSURL *)location {
 }
 
 - (void)ctrlSegChanged:(UISegmentedControl *)seg {
-    UITableViewCell *cell = (UITableViewCell *)seg.superview.superview;
-    NSIndexPath *ip = [self.tableView indexPathForCell:cell];
-    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    NSIndexPath *ip = [self indexPathForView:seg];
+    if (!ip) return;
     
+    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
     if (ip.row == 3) [d setInteger:seg.selectedSegmentIndex forKey:@"ctrl_alb"];
     if (ip.row == 7) [d setInteger:seg.selectedSegmentIndex forKey:@"ctrl_abb"];
 }
 
 - (void)ctrlSliderChanged:(UISlider *)slider {
-    UITableViewCell *cell = (UITableViewCell *)slider.superview.superview;
-    NSIndexPath *ip = [self.tableView indexPathForCell:cell];
+    NSIndexPath *ip = [self indexPathForView:slider];
+    if (!ip) return;
+
     UILabel *label = (UILabel *)[slider.superview viewWithTag:100];
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
     
@@ -446,11 +439,12 @@ didFinishDownloadingToURL:(NSURL *)location {
 }
 
 - (void)switchChanged:(UISwitch *)sw {
-    UITableViewCell *cell = (UITableViewCell *)sw.superview.superview;
-    NSIndexPath *ip = [self.tableView indexPathForCell:cell];
+    NSIndexPath *ip = [self indexPathForView:sw];
     if (!ip || ip.section == 3) return;
     
     NSDictionary *item = [self itemAtIndexPath:ip];
+    if (!item) return;
+
     NSString *key = item[@"key"];
     [self setSwitch:key on:sw.isOn];
     
@@ -459,8 +453,7 @@ didFinishDownloadingToURL:(NSURL *)location {
             if (![other[@"key"] isEqualToString:key])
                 [self setSwitch:other[@"key"] on:NO];
         }
-        [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:1]
-                      withRowAnimation:UITableViewRowAnimationFade];
+        [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:1] withRowAnimation:UITableViewRowAnimationFade];
     }
 }
 
@@ -478,14 +471,12 @@ didFinishDownloadingToURL:(NSURL *)location {
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
     }
     
-    // Limpa a célula antiga para reutilização
     for (UIView *v in cell.contentView.subviews) [v removeFromSuperview];
     
     if (ip.section == 0) {
         if (!self.gameSegment) {
             self.gameSegment = [[UISegmentedControl alloc] initWithItems:@[@"FREE FIRE", @"FREE FIRE MAX"]];
             self.gameSegment.selectedSegmentIndex = 0;
-            [self.gameSegment addTarget:self action:@selector(startWithBypass:) forControlEvents:UIControlEventValueChanged]; // Apenas para atualizar a UI se necessário
         }
         self.gameSegment.frame = CGRectMake(10, 5, cell.contentView.bounds.size.width - 20, 34);
         [cell.contentView addSubview:self.gameSegment];
@@ -603,15 +594,12 @@ didFinishDownloadingToURL:(NSURL *)location {
     return cell;
 }
 
-// ---- Overlay ----
-
 - (void)showOverlayWithText:(NSString *)text {
     [self hideOverlay];
     UIView *overlay = [[UIView alloc] initWithFrame:self.view.bounds];
     overlay.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     overlay.backgroundColor  = [UIColor colorWithWhite:0 alpha:0.75];
-    UIActivityIndicatorView *spinner = [[UIActivityIndicatorView alloc]
-        initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
+    UIActivityIndicatorView *spinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
     spinner.color = [UIColor colorWithWhite:1 alpha:0.75];
     spinner.center = CGPointMake(overlay.center.x, overlay.center.y - 30);
     [spinner startAnimating];
@@ -620,8 +608,7 @@ didFinishDownloadingToURL:(NSURL *)location {
     lbl.textColor = [UIColor whiteColor];
     lbl.font = [UIFont systemFontOfSize:22 weight:UIFontWeightBlack];
     lbl.textAlignment = NSTextAlignmentCenter;
-    lbl.frame = CGRectMake(0, spinner.frame.origin.y + spinner.frame.size.height + 8,
-                           overlay.bounds.size.width, 40);
+    lbl.frame = CGRectMake(0, spinner.frame.origin.y + spinner.frame.size.height + 8, overlay.bounds.size.width, 40);
     [overlay addSubview:spinner];
     [overlay addSubview:lbl];
     [self.view addSubview:overlay];
@@ -633,23 +620,15 @@ didFinishDownloadingToURL:(NSURL *)location {
     self.overlayView = nil;
 }
 
-// ---- UI build (AQUI ESTAVA O PROBLEMA, AGORA ARRUMADO) ----
-
 - (void)buildUI {
     CGFloat width = self.view.bounds.size.width;
     CGFloat safeTop = 100.0; 
     
-    // 1. Segmento de Jogo (Fora da tabela para ficar fixo no topo)
-    // Nota: Se preferir que ele fique dentro da tabela, a lógica na seção 0 já o cobre.
-    // Vou removê-lo do topo fixo para usar a seção 0 da tabela, mantendo o padrão.
-
-    // 2. Progress View
     self.progressView = [[UIProgressView alloc] initWithProgressViewStyle:UIProgressViewStyleDefault];
     self.progressView.frame = CGRectMake(20, safeTop, width - 40, 10);
     self.progressView.progressTintColor = [UIColor systemBlueColor];
     [self.view addSubview:self.progressView];
     
-    // 3. Progress Label
     self.progressLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, safeTop + 20, width - 40, 30)];
     self.progressLabel.text = @"Aguardando...";
     self.progressLabel.textColor = [UIColor whiteColor];
@@ -657,7 +636,6 @@ didFinishDownloadingToURL:(NSURL *)location {
     self.progressLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
     [self.view addSubview:self.progressLabel];
     
-    // 4. Botões Inject e Bypass
     CGFloat btnWidth = (width - 50) / 2;
     self.injectButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.injectButton.frame = CGRectMake(20, safeTop + 60, btnWidth, 45);
@@ -677,14 +655,13 @@ didFinishDownloadingToURL:(NSURL *)location {
     [self.bypassButton addTarget:self action:@selector(bypassTapped) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.bypassButton];
 
-    // 5. Table View (Onde ficam as configurações)
     CGFloat tableY = safeTop + 120;
     self.tableView = [[UITableView alloc] initWithFrame:CGRectMake(0, tableY, width, self.view.bounds.size.height - tableY) style:UITableViewStyleGrouped];
     self.tableView.backgroundColor = [UIColor blackColor];
     self.tableView.dataSource = self;
     self.tableView.delegate = self;
     self.tableView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    self.tableView.tableFooterView = [UIView new]; // Limpa células vazias
+    self.tableView.tableFooterView = [UIView new]; 
     [self.view addSubview:self.tableView];
 }
 
