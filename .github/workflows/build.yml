@@ -20,7 +20,6 @@ jobs:
 
     - name: Patch SecTask API (removed from iOS 18 SDK)
       run: |
-        # Cria um header com as declarações manuais da API SecTask
         cat > SecTaskCompat.h << 'EOF'
         #ifndef SecTaskCompat_h
         #define SecTaskCompat_h
@@ -28,24 +27,20 @@ jobs:
         #import <Foundation/Foundation.h>
         #import <Security/Security.h>
 
-        // Declarações manuais: SecTask.h foi removido do SDK público do iOS 18
         typedef CFTypeRef SecTaskRef;
         extern SecTaskRef SecTaskCreateFromSelf(CFAllocatorRef allocator);
         extern CFStringRef SecTaskCopySigningIdentifier(SecTaskRef task, CFErrorRef *error);
         extern CFStringRef SecTaskCopyValueForEntitlement(SecTaskRef task, CFStringRef entitlement, CFErrorRef *error);
-        extern void CFRelease(CFTypeRef cf);
 
         #endif
         EOF
 
-        # Injeta o include no topo do MCMInjector.m (se ainda não estiver lá)
         if ! grep -q "SecTaskCompat.h" MCMInjector.m; then
           sed -i '' '1i\
         #import "SecTaskCompat.h"
         ' MCMInjector.m
         fi
 
-        # Mostra as primeiras linhas para conferir no log
         head -n 5 MCMInjector.m
 
     - name: Create Minimal Xcode Project
@@ -113,7 +108,7 @@ jobs:
                     CLANG_ENABLE_OBJC_ARC = NO;
                     CLANG_ENABLE_OBJC_WEAK = YES;
                     ALWAYS_SEARCH_USER_PATHS = NO;
-                    OTHER_LDFLAGS = "-framework Security";
+                    OTHER_LDFLAGS = "-framework Security -framework UIKit -framework IOKit -framework CoreGraphics";
                     HEADER_SEARCH_PATHS = "$(SRCROOT)";
                 }; name = Debug; };
                 I2 = {isa = XCBuildConfiguration; buildSettings = {
@@ -122,7 +117,7 @@ jobs:
                     CLANG_ENABLE_OBJC_ARC = NO;
                     CLANG_ENABLE_OBJC_WEAK = YES;
                     ALWAYS_SEARCH_USER_PATHS = NO;
-                    OTHER_LDFLAGS = "-framework Security";
+                    OTHER_LDFLAGS = "-framework Security -framework UIKit -framework IOKit -framework CoreGraphics";
                     HEADER_SEARCH_PATHS = "$(SRCROOT)";
                 }; name = Release; };
         /* End XCBuildConfiguration section */
@@ -180,7 +175,7 @@ jobs:
           CLANG_ENABLE_OBJC_ARC=NO \
           CLANG_ENABLE_OBJC_WEAK=YES \
           ALWAYS_SEARCH_USER_PATHS=NO \
-          OTHER_LDFLAGS="-framework Security" \
+          OTHER_LDFLAGS="-framework Security -framework UIKit -framework IOKit -framework CoreGraphics" \
           HEADER_SEARCH_PATHS="$PWD"
 
     - name: Create Unsigned IPA
