@@ -43,13 +43,11 @@ static NSArray *_extraItems(void) {
     [self buildUI];
 }
 
-// ---- AJUDANTE CRUCIAL: Descobre a linha da tabela de forma segura ----
 - (NSIndexPath *)indexPathForView:(UIView *)view {
     CGPoint point = [view convertPoint:CGPointZero toView:self.tableView];
     return [self.tableView indexPathForRowAtPoint:point];
 }
 
-// ---- Switch state ----
 - (BOOL)switchOn:(NSString *)key {
     NSString *k = [NSString stringWithFormat:@"switch_%@", key];
     return [[NSUserDefaults standardUserDefaults] boolForKey:k];
@@ -64,7 +62,6 @@ static NSArray *_extraItems(void) {
     return [[NSUserDefaults standardUserDefaults] boolForKey:@"ctrl_ativar"];
 }
 
-// ---- Inject / Bypass ----
 - (void)injectTapped  { [self startWithBypass:NO]; }
 - (void)bypassTapped  { [self startWithBypass:YES]; }
 
@@ -106,6 +103,7 @@ static NSArray *_extraItems(void) {
     return uuid;
 }
 
+// ---- CORREÇÃO AQUI: Tratamento de erros e Timeout ----
 - (void)ensureTokenThenLoadMods {
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
     NSString *token = [d stringForKey:@"polonium_api_token"];
@@ -114,51 +112,118 @@ static NSArray *_extraItems(void) {
         dispatch_async(dispatch_get_main_queue(), ^{
             self.progressLabel.text = @"Registrando dispositivo...";
         });
-        NSMutableURLRequest *req = [NSMutableURLRequest
-            requestWithURL:[NSURL URLWithString:[[ObfSec apiBase] stringByAppendingString:[ObfSec epRegister]]]];
+
+        NSString *baseUrl = [ObfSec apiBase];
+        NSString *regPath = [ObfSec epRegister];
+        
+        if (!baseUrl || !regPath) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self fail:@"Erro interno: ObfSec retornou URL vazia."];
+            });
+            return;
+        }
+
+        NSString *fullUrl = [baseUrl stringByAppendingString:regPath];
+        NSURL *url = [NSURL URLWithString:fullUrl];
+        
+        if (!url) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self fail:[NSString stringWithFormat:@"URL de registro inválida: %@", fullUrl]];
+            });
+            return;
+        }
+
+        NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:url];
         req.HTTPMethod = @"POST";
         req.timeoutInterval = 15.0;
         [req setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
-        req.HTTPBody = [NSJSONSerialization
-            dataWithJSONObject:@{@"device_uuid": [self apiDeviceUuid]} options:0 error:nil];
+        
+        NSData *bodyData = [NSJSONSerialization dataWithJSONObject:@{@"device_uuid": [self apiDeviceUuid]} options:0 error:nil];
+        req.HTTPBody = bodyData;
 
         dispatch_semaphore_t sem = dispatch_semaphore_create(0);
         __block NSString *newToken = nil;
-        NSURLSessionDataTask *task = [[SecureHTTP session]
+        __block NSError *requestError = nil;
+        
+        // Usando NSURLSession padão aqui para evitar problemas de SSL do SecureHTTP no registro
+        NSURLSessionDataTask *task = [[NSURLSession sharedSession]
             dataTaskWithRequest:req
               completionHandler:^(NSData *data, NSURLResponse *r, NSError *e) {
+            requestError = e;
             if (!e && data) {
                 id json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-                newToken = json[@"token"];
-                if (newToken) [d setObject:newToken forKey:@"polonium_api_token"];
+                if ([json isKindOfClass:[NSDictionary class]]) {
+                    newToken = json[@"token"];
+                    if (newToken) [d setObject:newToken forKey:@"polonium_api_token"];
+                }
             }
             dispatch_semaphore_signal(sem);
         }];
         [task resume];
-        dispatch_semaphore_wait(sem, DISPATCH_TIME_FOREVER);
+        
+        // Timeout de 15 segundos para evitar travamento infinito
+        long waitResult = dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, 15 * NSEC_PER_SEC));
+        
+        if (waitResult != 0) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self fail:@"Timeout ao conectar com o servidor. Verifique sua internet."];
+            });
+            return;
+        }
+        
+        if (!newToken) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                NSString *msg = requestError ? requestError.localizedDescription : @"O servidor não retornou um token válido.";
+                [self fail:[NSString stringWithFormat:@"Falha no registro: %@", msg]];
+            });
+            return;
+        }
         token = newToken;
     }
-    if (token.length) [self loadModsFromApi];
+    
+    if (token.length) {
+        [self loadModsFromApi];
+    } else {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self fail:@"Token não encontrado e não foi possível registrar."];
+        });
+    }
 }
 
 - (void)loadModsFromApi {
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
     NSString *token   = [d stringForKey:@"polonium_api_token"];
 
-    NSString *modsUrl = [[[ObfSec apiBase]
-        stringByAppendingString:[ObfSec epModsPrefix]]
-        stringByAppendingString:self.gameKey];
+    NSString *baseUrl = [ObfSec apiBase];
+    NSString *modsPrefix = [ObfSec epModsPrefix];
+    
+    if (!baseUrl || !modsPrefix || !self.gameKey) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self fail:@"Erro interno: Configuração da API inválida."];
+        });
+        return;
+    }
 
-    NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:modsUrl]];
+    NSString *modsUrl = [[baseUrl stringByAppendingString:modsPrefix] stringByAppendingString:self.gameKey];
+    NSURL *url = [NSURL URLWithString:modsUrl];
+    
+    if (!url) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self fail:[NSString stringWithFormat:@"URL de mods inválida: %@", modsUrl]];
+        });
+        return;
+    }
+
+    NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:url];
     req.timeoutInterval = 30.0;
-    if (token) [req setValue:[@"Bearer " stringByAppendingString:token]
-                          forHTTPHeaderField:@"Authorization"];
+    if (token) [req setValue:[@"Bearer " stringByAppendingString:token] forHTTPHeaderField:@"Authorization"];
 
-    NSURLSessionDataTask *task = [[SecureHTTP session]
+    NSURLSessionDataTask *task = [[NSURLSession sharedSession]
         dataTaskWithRequest:req
           completionHandler:^(NSData *data, NSURLResponse *r, NSError *e) {
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (e || !data) { [self fail:@"API inacessivel"]; return; }
+            if (e) { [self fail:[NSString stringWithFormat:@"Erro na API: %@", e.localizedDescription]]; return; }
+            if (!data) { [self fail:@"API retornou vazio"]; return; }
 
             NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
             if (![json isKindOfClass:[NSDictionary class]]) { [self fail:@"Resposta da API invalida"]; return; }
@@ -366,8 +431,6 @@ static NSArray *_extraItems(void) {
     });
 }
 
-// ---- CONTROLE AO VIVO switch handlers ----
-
 - (void)ctrlSwitchChanged:(UISwitch *)sw {
     NSIndexPath *ip = [self indexPathForView:sw];
     if (!ip) return;
@@ -419,8 +482,6 @@ static NSArray *_extraItems(void) {
         label.text = [NSString stringWithFormat:@"%ld", (long)v];
     }
 }
-
-// ---- UITableView DataSource ----
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tv { return 4; }
 
