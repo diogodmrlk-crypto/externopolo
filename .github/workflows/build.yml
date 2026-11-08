@@ -79,13 +79,15 @@ jobs:
                 I1 = {isa = XCBuildConfiguration; buildSettings = {
                     PRODUCT_NAME = "$(TARGET_NAME)";
                     INFOPLIST_FILE = "";
-                    CLANG_ENABLE_OBJC_ARC = YES;
+                    CLANG_ENABLE_OBJC_ARC = NO;
+                    CLANG_ENABLE_OBJC_WEAK = YES;
                     ALWAYS_SEARCH_USER_PATHS = NO;
                 }; name = Debug; };
                 I2 = {isa = XCBuildConfiguration; buildSettings = {
                     PRODUCT_NAME = "$(TARGET_NAME)";
                     INFOPLIST_FILE = "";
-                    CLANG_ENABLE_OBJC_ARC = YES;
+                    CLANG_ENABLE_OBJC_ARC = NO;
+                    CLANG_ENABLE_OBJC_WEAK = YES;
                     ALWAYS_SEARCH_USER_PATHS = NO;
                 }; name = Release; };
         /* End XCBuildConfiguration section */
@@ -140,7 +142,9 @@ jobs:
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO \
           CODE_SIGN_ENTITLEMENTS="" \
-          CLANG_ENABLE_OBJC_ARC=YES
+          CLANG_ENABLE_OBJC_ARC=NO \
+          CLANG_ENABLE_OBJC_WEAK=YES \
+          ALWAYS_SEARCH_USER_PATHS=NO
 
     - name: Create Unsigned IPA
       run: |
