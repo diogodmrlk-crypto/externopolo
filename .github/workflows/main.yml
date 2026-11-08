@@ -1,0 +1,58 @@
+name: Build Signed IPA
+on: [workflow_dispatch]
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Import Certificate and Profile
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE }}
+          P12_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+        run: |
+          # Decodifica e instala o certificado no Keychain temporário
+          echo $CERTIFICATE_BASE64 | base64 --decode > cert.p12
+          security create-keychain -p actions temp.keychain
+          security import cert.p12 -k temp.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k actions temp.keychain
+          
+          # Instala o Provisioning Profile
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo $PROFILE_BASE64 | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+      
+      - name: Build and Export IPA
+        run: |
+          # Substitua "externopolo" pelo nome do seu Scheme
+          xcodebuild -project externopolo.xcodeproj \
+            -scheme externopolo \
+            -sdk iphoneos \
+            -configuration Release \
+            -archivePath $PWD/build/app.xcarchive \
+            archive
+            
+          # Cria o ExportOptions.plist (essencial para exportar o .ipa)
+          cat > ExportOptions.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>development</string>
+              <key>teamID</key>
+              <string>SEU_TEAM_ID</string>
+          </dict>
+          </plist>
+          EOF
+          
+          xcodebuild -exportArchive \
+            -archivePath $PWD/build/app.xcarchive \
+            -exportOptionsPlist ExportOptions.plist \
+            -exportPath $PWD/build/
+      
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-ipa
+          path: build/*.ipa
