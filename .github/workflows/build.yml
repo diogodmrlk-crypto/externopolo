@@ -18,6 +18,36 @@ jobs:
         sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
         xcodebuild -version
 
+    - name: Patch SecTask API (removed from iOS 18 SDK)
+      run: |
+        # Cria um header com as declarações manuais da API SecTask
+        cat > SecTaskCompat.h << 'EOF'
+        #ifndef SecTaskCompat_h
+        #define SecTaskCompat_h
+
+        #import <Foundation/Foundation.h>
+        #import <Security/Security.h>
+
+        // Declarações manuais: SecTask.h foi removido do SDK público do iOS 18
+        typedef CFTypeRef SecTaskRef;
+        extern SecTaskRef SecTaskCreateFromSelf(CFAllocatorRef allocator);
+        extern CFStringRef SecTaskCopySigningIdentifier(SecTaskRef task, CFErrorRef *error);
+        extern CFStringRef SecTaskCopyValueForEntitlement(SecTaskRef task, CFStringRef entitlement, CFErrorRef *error);
+        extern void CFRelease(CFTypeRef cf);
+
+        #endif
+        EOF
+
+        # Injeta o include no topo do MCMInjector.m (se ainda não estiver lá)
+        if ! grep -q "SecTaskCompat.h" MCMInjector.m; then
+          sed -i '' '1i\
+        #import "SecTaskCompat.h"
+        ' MCMInjector.m
+        fi
+
+        # Mostra as primeiras linhas para conferir no log
+        head -n 5 MCMInjector.m
+
     - name: Create Minimal Xcode Project
       run: |
         mkdir -p externopolo.xcodeproj/xcshareddata/xcschemes
@@ -46,15 +76,16 @@ jobs:
                 A13 /* ObfSec.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ObfSec.m; sourceTree = "<group>"; };
                 A14 /* SecureHTTP.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SecureHTTP.h; sourceTree = "<group>"; };
                 A15 /* SecureHTTP.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SecureHTTP.m; sourceTree = "<group>"; };
-                A16 /* externopolo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = externopolo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+                A16 /* SecTaskCompat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SecTaskCompat.h; sourceTree = "<group>"; };
+                A17 /* externopolo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = externopolo.app; sourceTree = BUILT_PRODUCTS_DIR; };
         /* End PBXFileReference section */
         /* Begin PBXGroup section */
                 B1 = {isa = PBXGroup; children = (B2, B3,); sourceTree = "<group>"; };
-                B2 = {isa = PBXGroup; children = (A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15,); name = externopolo; sourceTree = "<group>"; };
-                B3 = {isa = PBXGroup; children = (A16,); name = Products; sourceTree = "<group>"; };
+                B2 = {isa = PBXGroup; children = (A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16,); name = externopolo; sourceTree = "<group>"; };
+                B3 = {isa = PBXGroup; children = (A17,); name = Products; sourceTree = "<group>"; };
         /* End PBXGroup section */
         /* Begin PBXNativeTarget section */
-                C1 = {isa = PBXNativeTarget; buildConfigurationList = D1; buildPhases = (E1, E2,); buildRules = (); dependencies = (); name = externopolo; productName = externopolo; productReference = A16; productType = "com.apple.product-type.application"; };
+                C1 = {isa = PBXNativeTarget; buildConfigurationList = D1; buildPhases = (E1, E2,); buildRules = (); dependencies = (); name = externopolo; productName = externopolo; productReference = A17; productType = "com.apple.product-type.application"; };
         /* End PBXNativeTarget section */
         /* Begin PBXProject section */
                 F1 = {isa = PBXProject; attributes = {LastUpgradeCheck = 1200;}; buildConfigurationList = G1; compatibilityVersion = "Xcode 3.2"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base,); mainGroup = B1; productRefGroup = B3; projectDirPath = ""; projectRoot = ""; targets = (C1,); };
@@ -82,6 +113,8 @@ jobs:
                     CLANG_ENABLE_OBJC_ARC = NO;
                     CLANG_ENABLE_OBJC_WEAK = YES;
                     ALWAYS_SEARCH_USER_PATHS = NO;
+                    OTHER_LDFLAGS = "-framework Security";
+                    HEADER_SEARCH_PATHS = "$(SRCROOT)";
                 }; name = Debug; };
                 I2 = {isa = XCBuildConfiguration; buildSettings = {
                     PRODUCT_NAME = "$(TARGET_NAME)";
@@ -89,6 +122,8 @@ jobs:
                     CLANG_ENABLE_OBJC_ARC = NO;
                     CLANG_ENABLE_OBJC_WEAK = YES;
                     ALWAYS_SEARCH_USER_PATHS = NO;
+                    OTHER_LDFLAGS = "-framework Security";
+                    HEADER_SEARCH_PATHS = "$(SRCROOT)";
                 }; name = Release; };
         /* End XCBuildConfiguration section */
         /* Begin XCConfigurationList section */
@@ -144,7 +179,9 @@ jobs:
           CODE_SIGN_ENTITLEMENTS="" \
           CLANG_ENABLE_OBJC_ARC=NO \
           CLANG_ENABLE_OBJC_WEAK=YES \
-          ALWAYS_SEARCH_USER_PATHS=NO
+          ALWAYS_SEARCH_USER_PATHS=NO \
+          OTHER_LDFLAGS="-framework Security" \
+          HEADER_SEARCH_PATHS="$PWD"
 
     - name: Create Unsigned IPA
       run: |
