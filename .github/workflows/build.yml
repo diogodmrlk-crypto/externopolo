@@ -107,7 +107,7 @@ jobs:
                     GENERATE_INFOPLIST_FILE = YES;
                     INFOPLIST_KEY_CFBundleDisplayName = "externopolo";
                     INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-                    INFOPLIST_KEY_UIApplicationSceneManifest_Generation = NO; 
+                    INFOPLIST_KEY_UIApplicationSceneManifest_Generation = NO;
                     INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait";
                     INFOPLIST_KEY_UIStatusBarHidden = NO;
                     INFOPLIST_KEY_UIRequiresFullScreen = YES;
@@ -124,7 +124,7 @@ jobs:
                     GENERATE_INFOPLIST_FILE = YES;
                     INFOPLIST_KEY_CFBundleDisplayName = "externopolo";
                     INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-                    INFOPLIST_KEY_UIApplicationSceneManifest_Generation = NO; 
+                    INFOPLIST_KEY_UIApplicationSceneManifest_Generation = NO;
                     INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait";
                     INFOPLIST_KEY_UIStatusBarHidden = NO;
                     INFOPLIST_KEY_UIRequiresFullScreen = YES;
