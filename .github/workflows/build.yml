@@ -107,8 +107,10 @@ jobs:
                     GENERATE_INFOPLIST_FILE = YES;
                     INFOPLIST_KEY_CFBundleDisplayName = "externopolo";
                     INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-                    INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+                    INFOPLIST_KEY_UIApplicationSceneManifest_Generation = NO; 
                     INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait";
+                    INFOPLIST_KEY_UIStatusBarHidden = NO;
+                    INFOPLIST_KEY_UIRequiresFullScreen = YES;
                     CLANG_ENABLE_OBJC_ARC = NO;
                     CLANG_ENABLE_OBJC_WEAK = YES;
                     ALWAYS_SEARCH_USER_PATHS = NO;
@@ -122,8 +124,10 @@ jobs:
                     GENERATE_INFOPLIST_FILE = YES;
                     INFOPLIST_KEY_CFBundleDisplayName = "externopolo";
                     INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-                    INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+                    INFOPLIST_KEY_UIApplicationSceneManifest_Generation = NO; 
                     INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait";
+                    INFOPLIST_KEY_UIStatusBarHidden = NO;
+                    INFOPLIST_KEY_UIRequiresFullScreen = YES;
                     CLANG_ENABLE_OBJC_ARC = NO;
                     CLANG_ENABLE_OBJC_WEAK = YES;
                     ALWAYS_SEARCH_USER_PATHS = NO;
@@ -190,6 +194,7 @@ jobs:
           OTHER_LDFLAGS="-framework Security -framework UIKit -framework IOKit -framework CoreGraphics" \
           HEADER_SEARCH_PATHS="$PWD" \
           GENERATE_INFOPLIST_FILE=YES \
+          INFOPLIST_KEY_UIApplicationSceneManifest_Generation=NO \
           PRODUCT_BUNDLE_IDENTIFIER="com.externopolo.app" \
           IPHONEOS_DEPLOYMENT_TARGET="14.0"
 
