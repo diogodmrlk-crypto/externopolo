@@ -7,7 +7,6 @@
 
 // ---- Item definitions ----
 
-// aimItems: items in the AIM section
 static NSArray *_aimItems(void) {
     return @[
         @{@"key": @"aim_pecho",  @"label": @"Aim Peito",   @"mod": @"Pecho"},
@@ -16,7 +15,7 @@ static NSArray *_aimItems(void) {
         @{@"key": @"aim_head",   @"label": @"Aim Head",     @"mod": @"AimHead"},
     ];
 }
-// extraItems: items in the EXTRA section
+
 static NSArray *_extraItems(void) {
     return @[
         @{@"key": @"reset_guest", @"label": @"Reset Guest"},
@@ -35,11 +34,14 @@ static NSArray *_extraItems(void) {
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.title = @"Polonium";
+    self.view.backgroundColor = [UIColor blackColor]; // Fundo escuro para combinar
+    
     NSURLSessionConfiguration *cfg = [NSURLSessionConfiguration ephemeralSessionConfiguration];
     cfg.timeoutIntervalForRequest  = 60.0;
     cfg.timeoutIntervalForResource = 600.0;
     self.session = [SecureHTTP sessionWithDownloadDelegate:self];
     [[HttpStateServer shared] start];
+    
     [self buildUI];
 }
 
@@ -65,7 +67,6 @@ static NSArray *_extraItems(void) {
 - (void)bypassTapped  { [self startWithBypass:YES]; }
 
 - (void)startWithBypass:(BOOL)bypass {
-    // need at least one mod on
     BOOL anyOn = NO;
     for (NSDictionary *item in self.allItems)
         if ([self switchOn:item[@"key"]]) { anyOn = YES; break; }
@@ -85,14 +86,12 @@ static NSArray *_extraItems(void) {
     self.isBypass   = bypass;
 
     self.progressLabel.text      = @"Preparando inject...";
-    self.progressLabel.textColor = [UIColor secondaryLabelColor];
+    self.progressLabel.textColor = [UIColor lightGrayColor];
     self.progressView.progress   = 0;
 
-    NSString *bundleId = (seg == 0) ? @"com.dts.freefireth" : @"com.dts.freefiremax";
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         [self ensureTokenThenLoadMods];
     });
-    (void)bundleId;
 }
 
 - (NSString *)apiDeviceUuid {
@@ -110,9 +109,8 @@ static NSArray *_extraItems(void) {
     NSString *token = [d stringForKey:@"polonium_api_token"];
 
     if (token.length == 0) {
-        // register device, get token
         dispatch_async(dispatch_get_main_queue(), ^{
-            self.progressLabel.text = [@"Preparando inject..." stringByAppendingString:@""];
+            self.progressLabel.text = @"Registrando dispositivo...";
         });
         NSMutableURLRequest *req = [NSMutableURLRequest
             requestWithURL:[NSURL URLWithString:[[ObfSec apiBase] stringByAppendingString:[ObfSec epRegister]]]];
@@ -147,7 +145,7 @@ static NSArray *_extraItems(void) {
 
     NSString *modsUrl = [[[ObfSec apiBase]
         stringByAppendingString:[ObfSec epModsPrefix]]
-        stringByAppendingString:self.gameKey];    // e.g. https://api.kamanova.store/api/device/mods/ffth
+        stringByAppendingString:self.gameKey];
 
     NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:modsUrl]];
     req.timeoutInterval = 30.0;
@@ -169,7 +167,6 @@ static NSArray *_extraItems(void) {
                 ? [NSJSONSerialization dataWithJSONObject:json[@"chams_json"] options:0 error:nil]
                 : nil;
 
-            // get container path
             NSString *bundleId = [self.gameKey isEqualToString:@"ffth"]
                 ? @"com.dts.freefireth" : @"com.dts.freefiremax";
             NSString *container = _MCMInjectorDataContainerPath(bundleId);
@@ -181,8 +178,6 @@ static NSArray *_extraItems(void) {
     }];
     [task resume];
 }
-
-// ---- Download URL builder ----
 
 - (NSString *)downloadUrlFor:(NSString *)file {
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
@@ -223,7 +218,6 @@ static NSArray *_extraItems(void) {
             [ops addObject:@{@"url": url, @"cache": [self cachePathFor:@"chams.bytes"], @"label": @"Chams"}];
         }
     } else {
-        // bypass: download original assetindexer
         for (NSDictionary *item in self.aimItems) {
             if (![self switchOn:item[@"key"]]) continue;
             NSString *url = [self downloadUrlFor:@"original/assetindexer.bytes"];
@@ -238,7 +232,7 @@ static NSArray *_extraItems(void) {
     self.ops      = ops;
     self.opsDone  = 0;
     self.opsTotal = ops.count;
-    self.progressLabel.text = @"Preparando inject...";
+    self.progressLabel.text = @"Baixando mods...";
     [self downloadNextOp];
 }
 
@@ -288,8 +282,6 @@ didFinishDownloadingToURL:(NSURL *)location {
     }
 }
 
-// ---- Apply cached assets ----
-
 - (void)applyCachedAssets {
     NSString *docs    = [self.containerPath stringByAppendingPathComponent:@"Documents"];
     NSString *avatar  = [docs stringByAppendingPathComponent:
@@ -332,8 +324,6 @@ didFinishDownloadingToURL:(NSURL *)location {
     [self finishApply];
 }
 
-// ---- Finish ----
-
 - (void)finishApply {
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         NSString *docs     = [self.containerPath stringByAppendingPathComponent:@"Documents"];
@@ -341,17 +331,14 @@ didFinishDownloadingToURL:(NSURL *)location {
         NSFileManager *fm  = [NSFileManager defaultManager];
 
         if (self.isBypass) {
-            // remove patch and config
             [fm removeItemAtPath:cfgPath error:nil];
             NSString *chamsPath = [docs stringByAppendingPathComponent:self.chamsFile];
             [fm removeItemAtPath:chamsPath error:nil];
         } else {
             [fm createDirectoryAtPath:docs withIntermediateDirectories:YES attributes:nil error:nil];
-            // write chams config
             if (self.ctrlAtivarOn && self.chamsJson) {
                 [self.chamsJson writeToFile:cfgPath atomically:YES];
             }
-            // write reset_guest flag
             if ([self switchOn:@"reset_guest"]) {
                 NSMutableDictionary *cfg = nil;
                 NSData *existing = [NSData dataWithContentsOfFile:cfgPath];
@@ -389,66 +376,67 @@ didFinishDownloadingToURL:(NSURL *)location {
 // ---- CONTROLE AO VIVO switch handlers ----
 
 - (void)ctrlSwitchChanged:(UISwitch *)sw {
-    NSIndexPath *ip = [self.tableView indexPathForCell:(UITableViewCell *)sw.superview.superview];
+    UITableViewCell *cell = (UITableViewCell *)sw.superview.superview;
+    NSIndexPath *ip = [self.tableView indexPathForCell:cell];
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
-    switch (ip.row) {
-        case 0: // Ativar
-            [d setBool:sw.isOn forKey:@"ctrl_ativar"];
-            if (!sw.isOn) {
-                [d setBool:NO forKey:@"ctrl_chams"];
-                [d setBool:NO forKey:@"ctrl_al"];
-                [d setBool:NO forKey:@"ctrl_sf"];
-                [d setBool:NO forKey:@"ctrl_ab"];
-            }
-            [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:3]
-                          withRowAnimation:UITableViewRowAnimationFade];
-            break;
-        case 1: [d setBool:sw.isOn forKey:@"ctrl_chams"]; break;
-        case 2: [d setBool:sw.isOn forKey:@"ctrl_al"]; break;
-        case 4: [d setBool:sw.isOn forKey:@"ctrl_sf"]; break;
-        case 6: [d setBool:sw.isOn forKey:@"ctrl_ab"]; break;
+    
+    if (ip.row == 0) { // Ativar
+        [d setBool:sw.isOn forKey:@"ctrl_ativar"];
+        if (!sw.isOn) {
+            [d setBool:NO forKey:@"ctrl_chams"];
+            [d setBool:NO forKey:@"ctrl_al"];
+            [d setBool:NO forKey:@"ctrl_sf"];
+            [d setBool:NO forKey:@"ctrl_ab"];
+        }
+        [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:3]
+                      withRowAnimation:UITableViewRowAnimationFade];
+    } else if (ip.row == 1) {
+        [d setBool:sw.isOn forKey:@"ctrl_chams"];
+    } else if (ip.row == 2) {
+        [d setBool:sw.isOn forKey:@"ctrl_al"];
+    } else if (ip.row == 4) {
+        [d setBool:sw.isOn forKey:@"ctrl_sf"];
+    } else if (ip.row == 6) {
+        [d setBool:sw.isOn forKey:@"ctrl_ab"];
     }
 }
 
 - (void)ctrlSegChanged:(UISegmentedControl *)seg {
-    NSIndexPath *ip = [self.tableView indexPathForCell:(UITableViewCell *)seg.superview.superview];
+    UITableViewCell *cell = (UITableViewCell *)seg.superview.superview;
+    NSIndexPath *ip = [self.tableView indexPathForCell:cell];
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
-    switch (ip.row) {
-        case 3: [d setInteger:seg.selectedSegmentIndex forKey:@"ctrl_alb"]; break; // Aimlock Bone
-        case 7: [d setInteger:seg.selectedSegmentIndex forKey:@"ctrl_abb"]; break; // Aimbot Bone
-    }
+    
+    if (ip.row == 3) [d setInteger:seg.selectedSegmentIndex forKey:@"ctrl_alb"];
+    if (ip.row == 7) [d setInteger:seg.selectedSegmentIndex forKey:@"ctrl_abb"];
 }
 
 - (void)ctrlSliderChanged:(UISlider *)slider {
-    NSIndexPath *ip = [self.tableView indexPathForCell:(UITableViewCell *)slider.superview.superview];
+    UITableViewCell *cell = (UITableViewCell *)slider.superview.superview;
+    NSIndexPath *ip = [self.tableView indexPathForCell:cell];
     UILabel *label = (UILabel *)[slider.superview viewWithTag:100];
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
-    switch (ip.row) {
-        case 5: { // Speed Mult (1.0 – 5.0)
-            double v = MAX(1.0, MIN(5.0, (double)slider.value));
-            [d setDouble:v forKey:@"ctrl_sfx"];
-            label.text = [NSString stringWithFormat:@"%.2fx", v];
-            break;
-        }
-        case 8: { // Aimbot FOV (5 – 180)
-            NSInteger v = MAX(5, MIN(180, (NSInteger)(slider.value + 0.5)));
-            [d setInteger:v forKey:@"ctrl_abf"];
-            label.text = [NSString stringWithFormat:@"%ld", (long)v];
-            break;
-        }
+    
+    if (ip.row == 5) { 
+        double v = MAX(1.0, MIN(5.0, (double)slider.value));
+        [d setDouble:v forKey:@"ctrl_sfx"];
+        label.text = [NSString stringWithFormat:@"%.2fx", v];
+    } else if (ip.row == 8) { 
+        NSInteger v = MAX(5, MIN(180, (NSInteger)(slider.value + 0.5)));
+        [d setInteger:v forKey:@"ctrl_abf"];
+        label.text = [NSString stringWithFormat:@"%ld", (long)v];
     }
 }
 
-// ---- UITableView (sections: 0=JOGO, 1=AIM, 2=EXTRA, 3=CONTROLE AO VIVO) ----
+// ---- UITableView DataSource ----
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tv { return 4; }
 
 - (NSInteger)tableView:(UITableView *)tv numberOfRowsInSection:(NSInteger)section {
     switch (section) {
-        case 0: return 1;                      // game picker
+        case 0: return 1;                      
         case 1: return self.aimItems.count;
         case 2: return self.extraItems.count;
-        case 3: return 9;                      // ativar, chams, al, alb(seg), sf, sfx(slider), ab, abb(seg), abf(slider)
+        case 3: return 9;                      
     }
     return 0;
 }
@@ -458,15 +446,14 @@ didFinishDownloadingToURL:(NSURL *)location {
 }
 
 - (void)switchChanged:(UISwitch *)sw {
-    // AIM / EXTRA sections: walks up view hierarchy to find UITableViewCell
-    UIView *v = sw.superview;
-    while (v && ![v isKindOfClass:[UITableViewCell class]]) v = v.superview;
-    NSIndexPath *ip = [self.tableView indexPathForCell:(UITableViewCell *)v];
+    UITableViewCell *cell = (UITableViewCell *)sw.superview.superview;
+    NSIndexPath *ip = [self.tableView indexPathForCell:cell];
     if (!ip || ip.section == 3) return;
+    
     NSDictionary *item = [self itemAtIndexPath:ip];
     NSString *key = item[@"key"];
     [self setSwitch:key on:sw.isOn];
-    // AIM section: only one aim at a time
+    
     if (ip.section == 1 && sw.isOn) {
         for (NSDictionary *other in self.aimItems) {
             if (![other[@"key"] isEqualToString:key])
@@ -483,9 +470,137 @@ didFinishDownloadingToURL:(NSURL *)location {
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tv cellForRowAtIndexPath:(NSIndexPath *)ip {
-    // omitted: returns cells with switches / segs / sliders per section and row
-    return [tv dequeueReusableCellWithIdentifier:@"cell"] ?: [[UITableViewCell alloc]
-        initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"cell"];
+    UITableViewCell *cell = [tv dequeueReusableCellWithIdentifier:@"cell"];
+    if (!cell) {
+        cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"cell"];
+        cell.backgroundColor = [UIColor darkGrayColor];
+        cell.textLabel.textColor = [UIColor whiteColor];
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+    }
+    
+    // Limpa a célula antiga para reutilização
+    for (UIView *v in cell.contentView.subviews) [v removeFromSuperview];
+    
+    if (ip.section == 0) {
+        if (!self.gameSegment) {
+            self.gameSegment = [[UISegmentedControl alloc] initWithItems:@[@"FREE FIRE", @"FREE FIRE MAX"]];
+            self.gameSegment.selectedSegmentIndex = 0;
+            [self.gameSegment addTarget:self action:@selector(startWithBypass:) forControlEvents:UIControlEventValueChanged]; // Apenas para atualizar a UI se necessário
+        }
+        self.gameSegment.frame = CGRectMake(10, 5, cell.contentView.bounds.size.width - 20, 34);
+        [cell.contentView addSubview:self.gameSegment];
+        cell.textLabel.text = @"";
+        
+    } else if (ip.section == 1 || ip.section == 2) {
+        NSDictionary *item = [self itemAtIndexPath:ip];
+        UISwitch *sw = [[UISwitch alloc] init];
+        sw.on = [self switchOn:item[@"key"]];
+        [sw addTarget:self action:@selector(switchChanged:) forControlEvents:UIControlEventValueChanged];
+        
+        cell.textLabel.text = item[@"label"];
+        cell.accessoryView = sw;
+        
+    } else if (ip.section == 3) {
+        cell.textLabel.text = @"";
+        cell.accessoryView = nil;
+        
+        NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+        CGFloat width = cell.contentView.bounds.size.width;
+        
+        if (ip.row == 0) {
+            cell.textLabel.text = @"Ativar Controle";
+            UISwitch *sw = [[UISwitch alloc] init];
+            sw.on = [d boolForKey:@"ctrl_ativar"];
+            [sw addTarget:self action:@selector(ctrlSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+            cell.accessoryView = sw;
+            
+        } else if (ip.row == 1) {
+            cell.textLabel.text = @"Chams";
+            UISwitch *sw = [[UISwitch alloc] init];
+            sw.on = [d boolForKey:@"ctrl_chams"];
+            sw.enabled = [d boolForKey:@"ctrl_ativar"];
+            [sw addTarget:self action:@selector(ctrlSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+            cell.accessoryView = sw;
+            
+        } else if (ip.row == 2) {
+            cell.textLabel.text = @"Aimlock";
+            UISwitch *sw = [[UISwitch alloc] init];
+            sw.on = [d boolForKey:@"ctrl_al"];
+            sw.enabled = [d boolForKey:@"ctrl_ativar"];
+            [sw addTarget:self action:@selector(ctrlSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+            cell.accessoryView = sw;
+            
+        } else if (ip.row == 3) {
+            cell.textLabel.text = @"Aimlock Bone";
+            UISegmentedControl *seg = [[UISegmentedControl alloc] initWithItems:@[@"Head", @"Chest"]];
+            seg.selectedSegmentIndex = [d integerForKey:@"ctrl_alb"];
+            seg.enabled = [d boolForKey:@"ctrl_ativar"];
+            seg.frame = CGRectMake(width - 160, 7, 150, 30);
+            [seg addTarget:self action:@selector(ctrlSegChanged:) forControlEvents:UIControlEventValueChanged];
+            [cell.contentView addSubview:seg];
+            
+        } else if (ip.row == 4) {
+            cell.textLabel.text = @"Speed";
+            UISwitch *sw = [[UISwitch alloc] init];
+            sw.on = [d boolForKey:@"ctrl_sf"];
+            sw.enabled = [d boolForKey:@"ctrl_ativar"];
+            [sw addTarget:self action:@selector(ctrlSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+            cell.accessoryView = sw;
+            
+        } else if (ip.row == 5) {
+            cell.textLabel.text = @"Speed Mult";
+            UISlider *slider = [[UISlider alloc] initWithFrame:CGRectMake(120, 10, width - 170, 30)];
+            slider.minimumValue = 1.0;
+            slider.maximumValue = 5.0;
+            slider.value = [d doubleForKey:@"ctrl_sfx"] ?: 1.0;
+            slider.enabled = [d boolForKey:@"ctrl_ativar"];
+            [slider addTarget:self action:@selector(ctrlSliderChanged:) forControlEvents:UIControlEventValueChanged];
+            
+            UILabel *lbl = [[UILabel alloc] initWithFrame:CGRectMake(width - 45, 10, 40, 30)];
+            lbl.tag = 100;
+            lbl.textColor = [UIColor whiteColor];
+            lbl.text = [NSString stringWithFormat:@"%.1fx", slider.value];
+            
+            [cell.contentView addSubview:slider];
+            [cell.contentView addSubview:lbl];
+            
+        } else if (ip.row == 6) {
+            cell.textLabel.text = @"Aimbot";
+            UISwitch *sw = [[UISwitch alloc] init];
+            sw.on = [d boolForKey:@"ctrl_ab"];
+            sw.enabled = [d boolForKey:@"ctrl_ativar"];
+            [sw addTarget:self action:@selector(ctrlSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+            cell.accessoryView = sw;
+            
+        } else if (ip.row == 7) {
+            cell.textLabel.text = @"Aimbot Bone";
+            UISegmentedControl *seg = [[UISegmentedControl alloc] initWithItems:@[@"Head", @"Chest"]];
+            seg.selectedSegmentIndex = [d integerForKey:@"ctrl_abb"];
+            seg.enabled = [d boolForKey:@"ctrl_ativar"];
+            seg.frame = CGRectMake(width - 160, 7, 150, 30);
+            [seg addTarget:self action:@selector(ctrlSegChanged:) forControlEvents:UIControlEventValueChanged];
+            [cell.contentView addSubview:seg];
+            
+        } else if (ip.row == 8) {
+            cell.textLabel.text = @"Aimbot FOV";
+            UISlider *slider = [[UISlider alloc] initWithFrame:CGRectMake(120, 10, width - 170, 30)];
+            slider.minimumValue = 5.0;
+            slider.maximumValue = 180.0;
+            slider.value = [d integerForKey:@"ctrl_abf"] ?: 90.0;
+            slider.enabled = [d boolForKey:@"ctrl_ativar"];
+            [slider addTarget:self action:@selector(ctrlSliderChanged:) forControlEvents:UIControlEventValueChanged];
+            
+            UILabel *lbl = [[UILabel alloc] initWithFrame:CGRectMake(width - 45, 10, 40, 30)];
+            lbl.tag = 100;
+            lbl.textColor = [UIColor whiteColor];
+            lbl.text = [NSString stringWithFormat:@"%ld", (long)slider.value];
+            
+            [cell.contentView addSubview:slider];
+            [cell.contentView addSubview:lbl];
+        }
+    }
+    
+    return cell;
 }
 
 // ---- Overlay ----
@@ -518,37 +633,59 @@ didFinishDownloadingToURL:(NSURL *)location {
     self.overlayView = nil;
 }
 
-// ---- UI build (structural; actual constraints/colors omitted for brevity) ----
+// ---- UI build (AQUI ESTAVA O PROBLEMA, AGORA ARRUMADO) ----
 
 - (void)buildUI {
-    // game segment: FREE FIRE / FREE FIRE MAX
-    UISegmentedControl *seg = [[UISegmentedControl alloc]
-        initWithItems:@[@"FREE FIRE", @"FREE FIRE MAX"]];
-    seg.selectedSegmentIndex = 0;
-    self.gameSegment = seg;
+    CGFloat width = self.view.bounds.size.width;
+    CGFloat safeTop = 100.0; 
+    
+    // 1. Segmento de Jogo (Fora da tabela para ficar fixo no topo)
+    // Nota: Se preferir que ele fique dentro da tabela, a lógica na seção 0 já o cobre.
+    // Vou removê-lo do topo fixo para usar a seção 0 da tabela, mantendo o padrão.
 
-    UIProgressView *pv = [[UIProgressView alloc] initWithProgressViewStyle:UIProgressViewStyleDefault];
-    self.progressView = pv;
+    // 2. Progress View
+    self.progressView = [[UIProgressView alloc] initWithProgressViewStyle:UIProgressViewStyleDefault];
+    self.progressView.frame = CGRectMake(20, safeTop, width - 40, 10);
+    self.progressView.progressTintColor = [UIColor systemBlueColor];
+    [self.view addSubview:self.progressView];
+    
+    // 3. Progress Label
+    self.progressLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, safeTop + 20, width - 40, 30)];
+    self.progressLabel.text = @"Aguardando...";
+    self.progressLabel.textColor = [UIColor whiteColor];
+    self.progressLabel.textAlignment = NSTextAlignmentCenter;
+    self.progressLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    [self.view addSubview:self.progressLabel];
+    
+    // 4. Botões Inject e Bypass
+    CGFloat btnWidth = (width - 50) / 2;
+    self.injectButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    self.injectButton.frame = CGRectMake(20, safeTop + 60, btnWidth, 45);
+    [self.injectButton setTitle:@"INJETAR" forState:UIControlStateNormal];
+    [self.injectButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    self.injectButton.backgroundColor = [UIColor systemBlueColor];
+    self.injectButton.layer.cornerRadius = 8.0;
+    [self.injectButton addTarget:self action:@selector(injectTapped) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:self.injectButton];
+    
+    self.bypassButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    self.bypassButton.frame = CGRectMake(30 + btnWidth, safeTop + 60, btnWidth, 45);
+    [self.bypassButton setTitle:@"BYPASS" forState:UIControlStateNormal];
+    [self.bypassButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    self.bypassButton.backgroundColor = [UIColor systemRedColor];
+    self.bypassButton.layer.cornerRadius = 8.0;
+    [self.bypassButton addTarget:self action:@selector(bypassTapped) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:self.bypassButton];
 
-    UILabel *pl = [UILabel new];
-    pl.text = @"";
-    self.progressLabel = pl;
-
-    UIButton *injectBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    [injectBtn setTitle:@"INJETAR" forState:UIControlStateNormal];
-    [injectBtn addTarget:self action:@selector(injectTapped) forControlEvents:UIControlEventTouchUpInside];
-    self.injectButton = injectBtn;
-
-    UIButton *bypassBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    [bypassBtn setTitle:@"BYPASS (DESATIVAR)" forState:UIControlStateNormal];
-    [bypassBtn addTarget:self action:@selector(bypassTapped) forControlEvents:UIControlEventTouchUpInside];
-    self.bypassButton = bypassBtn;
-
-    UITableView *tv = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStyleGrouped];
-    tv.dataSource = self;
-    tv.delegate   = self;
-    self.tableView = tv;
-    [self.view addSubview:tv];
+    // 5. Table View (Onde ficam as configurações)
+    CGFloat tableY = safeTop + 120;
+    self.tableView = [[UITableView alloc] initWithFrame:CGRectMake(0, tableY, width, self.view.bounds.size.height - tableY) style:UITableViewStyleGrouped];
+    self.tableView.backgroundColor = [UIColor blackColor];
+    self.tableView.dataSource = self;
+    self.tableView.delegate = self;
+    self.tableView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    self.tableView.tableFooterView = [UIView new]; // Limpa células vazias
+    [self.view addSubview:self.tableView];
 }
 
 @end
